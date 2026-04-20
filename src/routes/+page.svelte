@@ -214,9 +214,8 @@
                             id: file.id,
                             inputPath: file.path,
                             outputPath: outPath,
-                            quality: file.settings.qualityValue || 80,
-                            targetSize: parseFloat(file.settings.targetSize) || 0.0, // Đề phòng user để trống target size
-                            resolution: file.settings.resolution || "original",
+                            profile: file.settings.profile || "balance",
+                            targetSize: parseFloat(file.settings.targetSize) || 0.0,
                             codec: file.settings.codec || "h264",
                             muteAudio: file.settings.muteAudio || false,
                         });

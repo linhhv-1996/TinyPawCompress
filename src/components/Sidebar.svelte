@@ -112,13 +112,29 @@
         {/if}
 
         {#if activePanel === "video" && file.settings}
+            {@const hasTargetSize = file.settings.targetSize && parseFloat(file.settings.targetSize) > 0}
+            
             <div class="panel active">
                 <div class="side-header"><h4>{$lang.videoSettings}</h4></div>
 
-                <QualityPreset
-                    bind:value={file.settings.qualityValue}
-                    bind:activeTab={file.settings.qualityTab}
-                />
+                <!-- <div style="transition: 0.2s; {hasTargetSize ? 'opacity: 0.35; pointer-events: none; filter: grayscale(1);' : ''}">
+                    <QualityPreset
+                        bind:value={file.settings.qualityValue}
+                        bind:activeTab={file.settings.qualityTab}
+                    />
+                </div> -->
+                <div style="transition: 0.2s; {hasTargetSize ? 'opacity: 0.35; pointer-events: none; filter: grayscale(1);' : ''}">
+                    <PillGroup
+                        label={$lang.qualityProfile}
+                        bind:activeId={file.settings.profile}
+                        options={[
+                            { id: "low", label: "Low" },
+                            { id: "balance", label: "Balance" },
+                            { id: "high", label: "High" },
+                        ]}
+                    />
+                </div>
+        
                 <InputGroup
                     label={$lang.targetSize}
                     placeholder={$lang.maxWSizePlaceholder}
@@ -126,7 +142,7 @@
                     type="number"
                 />
 
-                <PillGroup
+                <!-- <PillGroup
                     label={$lang.resolution}
                     bind:activeId={file.settings.resolution}
                     options={[
@@ -134,7 +150,7 @@
                         { id: "1080p", label: $lang.res1080p },
                         { id: "720p", label: $lang.res720p },
                     ]}
-                />
+                /> -->
 
                 <PillGroup
                     label={$lang.videoCodec}

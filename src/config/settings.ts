@@ -1,9 +1,7 @@
 // Định nghĩa Typescript Interfaces cho cấu hình từng loại file
 export interface VideoSettings {
-    qualityTab: string;
-    qualityValue: number;
+    profile: string;
     targetSize: string | number;
-    resolution: string;
     codec: string;
     muteAudio: boolean;
 }
@@ -29,10 +27,8 @@ export function getDefaultSettings(fileType: string) {
     switch (fileType) {
         case 'video':
             return {
-                qualityTab: 'balance',
-                qualityValue: 80,
+                profile: 'balance',
                 targetSize: '',
-                resolution: 'original',
                 codec: 'h264',
                 muteAudio: false
             } as VideoSettings;
