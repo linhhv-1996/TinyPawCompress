@@ -66,3 +66,9 @@ public func compressVideoSwift(args: SRString) -> SRString {
     return SRString(result)
 }
 
+@_cdecl("cancel_video_swift")
+public func cancelVideoSwift(id: SRString) {
+    let videoId = id.toString()
+    VideoProcessor.cancelVideo(id: videoId)
+}
+

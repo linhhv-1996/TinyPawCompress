@@ -4,6 +4,7 @@ import AppKit
 
 // Cấu trúc map chuẩn với JSON từ Rust
 struct VideoCompressOptions: Codable {
+    let id: String
     let inputPath: String
     let outputPath: String
     let profile: String     // "low", "balance", "high"
@@ -13,6 +14,19 @@ struct VideoCompressOptions: Codable {
 }
 
 public class VideoProcessor {
+
+    nonisolated(unsafe) private static var activeSessions: [String: AVAssetExportSession] = [:]
+    private static let sessionQueue = DispatchQueue(label: "com.tinypaw.sessions")
+
+    // --- THÊM HÀM CANCEL ---
+    public static func cancelVideo(id: String) {
+        sessionQueue.sync {
+            if let session = activeSessions[id] {
+                session.cancelExport() // Bắn lệnh dừng ngay lập tức cho Apple
+            }
+        }
+    }
+
     
     // ----------------------------------------------------
     // 1. HÀM LẤY METADATA (Không đổi)
@@ -179,6 +193,8 @@ public class VideoProcessor {
         if finalTargetBytes > 0 {
             exportSession.fileLengthLimit = finalTargetBytes
         }
+
+        sessionQueue.sync { activeSessions[options.id] = exportSession }
         
         // --- BƯỚC D: THỰC THI NÉN ---
         let semaphore = DispatchSemaphore(value: 0)
@@ -187,6 +203,8 @@ public class VideoProcessor {
         }
         
         semaphore.wait() // Đợi quá trình nén chạy xong ngầm
+
+        sessionQueue.sync { activeSessions.removeValue(forKey: options.id) }
         
         switch exportSession.status {
         case .completed:
@@ -194,7 +212,7 @@ public class VideoProcessor {
         case .failed:
             return "Lỗi: \(exportSession.error?.localizedDescription ?? "Không xác định")"
         case .cancelled:
-            return "Lỗi: Đã hủy."
+            return "Cancelled" // SỬA THÀNH CHỮ "Cancelled" CHO KHỚP VỚI LOGIC CỦA SVELTE FE
         default:
             return "Lỗi hệ thống."
         }

@@ -20,6 +20,7 @@ swift!(fn generate_image_thumbnail_swift(path: &SRString) -> SRString);
 swift!(fn get_video_meta_swift(path: &SRString) -> SRString);
 swift!(fn generate_video_thumbnail_swift(path: &SRString) -> SRString);
 swift!(fn compress_video_swift(args: &SRString) -> SRString);
+swift!(fn cancel_video_swift(id: &SRString));
 
 
 mod pdf_compressor;
@@ -281,6 +282,7 @@ async fn compress_video_command(
 
     // 2. Gom tham số thành JSON (Đã sửa lại key cho khớp)
     let json_args = serde_json::json!({
+        "id": id.clone(),
         "inputPath": input_path,
         "outputPath": output_path,
         "profile": profile,
@@ -333,9 +335,14 @@ async fn compress_video_command(
 // Command này để FE gọi khi user bấm nút [X] Cancel
 #[tauri::command]
 fn cancel_compression_command(id: String, state: State<'_, AppState>) {
+    // 1. Đặt cờ cho Rust (để dừng các task chưa kịp chạy)
     if let Some(flag) = state.cancel_flags.lock().unwrap().get(&id) {
         flag.store(true, Ordering::Relaxed);
     }
+    
+    // 2. Bắn lệnh chọc thẳng xuống Swift để giết cái Export Session đang chạy ngầm
+    let sr_id = SRString::from(id.as_str());
+    unsafe { cancel_video_swift(&sr_id) };
 }
 
 
