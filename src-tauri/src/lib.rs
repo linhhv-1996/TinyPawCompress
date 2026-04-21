@@ -15,7 +15,6 @@ use swift_rs::{swift, SRString};
 
 swift!(fn get_pdf_meta_swift(path: &SRString) -> SRString);
 swift!(fn generate_pdf_thumbnail_swift(path: &SRString) -> SRString);
-swift!(fn compress_pdf_swift(args: &SRString) -> SRString);
 
 swift!(fn get_image_meta_swift(path: &SRString) -> SRString);
 swift!(fn generate_image_thumbnail_swift(path: &SRString) -> SRString);
