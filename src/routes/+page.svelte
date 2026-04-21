@@ -1,22 +1,24 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { fly } from "svelte/transition";
+
     import { listen, type UnlistenFn } from "@tauri-apps/api/event";
     import { invoke, convertFileSrc } from "@tauri-apps/api/core"; // convertFileSrc để hiện ảnh từ ổ cứng
     import { lang } from "../i18n";
     import FileCard from "../components/FileCard.svelte";
     import Sidebar from "../components/Sidebar.svelte";
-    import SettingsSidebar from "../components/SettingsSidebar.svelte";
     import { getDefaultSettings } from "../config/settings";
     import { join } from "@tauri-apps/api/path";
     import pLimit from 'p-limit';
+   import { openUrl } from "@tauri-apps/plugin-opener";
 
     // State quản lý danh sách file và UI
     let files: any[] = [];
     let selectedId: string | null = null;
     let isDragging = false;
-    let showSettings = false;
     let isCompressingAll = false;
 
+    let isPro = false;
     let showProModal = false;
     let licenseInput = "";
     let licenseError = "";
@@ -37,6 +39,10 @@
     $: selectedIndex = files.findIndex((f) => f.id === selectedId);
 
     onMount(() => {
+        invoke("get_pro_status").then((config: any) => {
+            isPro = config.is_pro;
+        }).catch(console.error);
+
         let unlistenFunctions: UnlistenFn[] = [];
 
         async function setupListeners() {
@@ -87,6 +93,25 @@
         setupListeners();
         return () => unlistenFunctions.forEach((fn) => fn());
     });
+
+    let toast = { show: false, message: "", type: "success" };
+    let toastTimeout: any;
+
+    function showToast(message: string, type: "success" | "info" | "error" = "success") {
+        if (toastTimeout) clearTimeout(toastTimeout); // Reset thời gian nếu bấm liên tục
+        toast = { show: true, message, type };
+        toastTimeout = setTimeout(() => {
+            toast.show = false;
+        }, 3000); // Tự động ẩn sau 3 giây
+    }
+
+    async function handleOpenExternalLink(url: string) {
+        try {
+            await openUrl(url);
+        } catch (error) {
+            console.error("Không thể mở link:", error);
+        }
+    }
 
     // Hàm xử lý chính khi có file mới
     async function handleNewFiles(paths: string[]) {
@@ -146,9 +171,9 @@
         try {
             const success = await invoke("verify_license", { key: licenseInput });
             if (success) {
+                isPro = true;
                 showProModal = false;
-                // Sửa dòng alert dưới đây:
-                alert("Upgraded to Pro successfully! Enjoy unlimited compressions 🚀");
+                showToast("Upgraded to Pro successfully!", "success");
             }
         } catch (err) {
             licenseError = String(err);
@@ -380,14 +405,39 @@
     <main class="main-content">
         <div class="title-bar" data-tauri-drag-region>
             {$lang.appName}
-            <!-- svelte-ignore a11y_consider_explicit_label -->
-            <button
-                class="title-btn-settings {showSettings ? 'active' : ''}"
-                on:click={() => { if (!isCompressingAll) showSettings = !showSettings }}
-                style="{isCompressingAll ? 'opacity: 0.5; cursor: not-allowed;' : ''}"
-            >
-                <i class="ph ph-gear"></i>
-            </button>
+                <div class="title-actions">
+                    <button
+                        class="title-btn"
+                        on:click={() => handleOpenExternalLink("https://your-website.com")}
+                        title="Visit Website"
+                    >
+                        <i class="ph ph-info"></i>
+                        <span class="btn-text">Info</span>
+                    </button>
+                
+                <button
+                    class="title-btn"
+                    on:click={() => { if (!isCompressingAll) showToast('Checking for updates...', 'info'); }}
+                    style="{isCompressingAll ? 'opacity: 0.5; cursor: not-allowed;' : ''}"
+                >
+                    <i class="ph ph-arrows-clockwise"></i>
+                    <span class="btn-text">Update</span>
+                </button>
+
+                <button
+                    class="title-btn {isPro ? 'pro-active' : 'pro-btn'}"
+                    on:click={() => { if (!isCompressingAll && !isPro) showProModal = true; }}
+                    style="{isCompressingAll ? 'opacity: 0.5; cursor: not-allowed;' : ''}"
+                >
+                    {#if isPro}
+                        <i class="ph-fill ph-check-circle"></i>
+                        <span class="btn-text">Pro Active</span>
+                    {:else}
+                        <i class="ph-fill ph-crown"></i>
+                        <span class="btn-text">Pro</span>
+                    {/if}
+                </button>
+            </div>
         </div>
 
         {#if files.length === 0}
@@ -455,9 +505,7 @@
         {/if}
     </main>
 
-    {#if showSettings}
-        <SettingsSidebar on:close={() => (showSettings = false)} />
-    {:else if selectedIndex !== -1}
+    {#if selectedIndex !== -1}
         <Sidebar
             bind:file={files[selectedIndex]}
             filesCount={files.length}
@@ -490,7 +538,12 @@
             <div class="control-group">
                 <div class="control-label" style="display: flex; justify-content: space-between; align-items: center;">
                     <span>Enter License Key:</span>
-                    <a href="https://your-website.com/buy" target="_blank" rel="noopener noreferrer" class="buy-link" tabindex="-1">
+                    <a 
+                        href="#" 
+                        class="buy-link" 
+                        tabindex="-1"
+                        on:click|preventDefault={() => handleOpenExternalLink("https://your-website.com/buy")}
+                    >
                         Get a key <i class="ph ph-arrow-up-right"></i>
                     </a>
                 </div>
@@ -525,6 +578,21 @@
     </div>
 {/if}
 
+
+{#if toast.show}
+    <div class="toast-wrapper" transition:fly={{ y: -20, duration: 300 }}>
+        <div class="toast-item {toast.type}">
+            {#if toast.type === 'success'}
+                <i class="ph-fill ph-check-circle"></i>
+            {:else if toast.type === 'info'}
+                <i class="ph-fill ph-info"></i>
+            {:else}
+                <i class="ph-fill ph-warning-circle"></i>
+            {/if}
+            <span>{toast.message}</span>
+        </div>
+    </div>
+{/if}
 
 <style>
     /* CSS cho vùng trung tâm mới */
@@ -647,7 +715,6 @@
         justify-content: center;
     }
     
-    /* Ghi đè style của class .btn-cancel (nếu chưa có sẵn ở trang này) */
     .btn-cancel {
         background: #FFFFFF; 
         border: 1px solid var(--border); 
@@ -659,6 +726,7 @@
         transition: all 0.2s ease; 
         box-shadow: 0 1px 2px rgba(0,0,0,0.02);
     }
+    
     .btn-cancel:hover { 
         background: #F3F4F6; 
     }
@@ -675,7 +743,115 @@
     }
     
     .buy-link:hover {
-        color: var(--accent); /* Sẽ dùng màu đen quyền lực bạn vừa đổi ban nãy */
+        color: var(--accent);
         text-decoration: underline;
+    }
+
+    /* Container chứa các nút góc phải */
+    .title-actions {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        gap: 6px; /* Giảm gap một chút cho gọn */
+        z-index: 10;
+    }
+
+    /* Nút cơ bản (Info/Update) */
+    .title-btn {
+        background: #FFFFFF;
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        height: 24px;
+        padding: 0 8px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+
+    .title-btn:hover {
+        background: #F3F4F6;
+        color: var(--text-main);
+    }
+
+    .title-btn i {
+        font-size: 14px;
+    }
+
+    /* Nếu muốn hiện cả chữ trên các nút thì giữ đoạn này */
+    .title-btn .btn-text {
+        display: inline; 
+    }
+
+    /* Style đặc biệt cho nút PRO */
+    .title-btn.pro-btn {
+        border-color: #FCD34D; /* Viền vàng nhạt */
+        color: #B45309;       /* Chữ cam đậm */
+        background: #FFFBEB;  /* Nền vàng siêu nhạt */
+    }
+
+    .title-btn.pro-btn:hover {
+        background: #FEF3C7;
+        color: #92400E;
+        border-color: #FBBF24;
+    }
+
+    .title-btn.pro-active {
+        border-color: #A7F3D0;
+        color: #059669;
+        background: #ECFDF5;
+        pointer-events: none;
+    }
+
+    /* TOAST NOTIFICATION */
+    .toast-wrapper {
+        position: fixed;
+        top: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9999;
+        pointer-events: none; /* Tránh block click chuột của user bên dưới */
+    }
+    
+    .toast-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        border-radius: 30px;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+    }
+    
+    .toast-item i {
+        font-size: 16px;
+    }
+    
+    .toast-item.success {
+        background: rgba(236, 253, 245, 0.95);
+        color: #059669;
+        border: 1px solid #A7F3D0;
+    }
+    
+    .toast-item.info {
+        background: rgba(243, 244, 246, 0.95);
+        color: #374151;
+        border: 1px solid #D1D5DB;
+    }
+    
+    .toast-item.error {
+        background: rgba(254, 242, 242, 0.95);
+        color: #DC2626;
+        border: 1px solid #FECACA;
     }
 </style>
