@@ -39,14 +39,6 @@ public func generateImageThumbnailSwift(path: SRString) -> SRString {
     return SRString("")
 }
 
-@_cdecl("compress_image_swift")
-public func compressImageSwift(args: SRString) -> SRString {
-    let jsonArgs = args.toString()
-    // Hàm này mình sẽ viết ở bước 2
-    let result = ImageProcessor.compressImage(jsonArgs: jsonArgs) 
-    return SRString(result)
-}
-
 // ---------------- XỬ LÝ VIDEO ----------------
 
 @_cdecl("get_video_meta_swift")

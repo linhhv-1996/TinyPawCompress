@@ -233,7 +233,7 @@
                             inputPath: file.path,
                             outputPath: outPath,
                             qualityValue: file.settings.qualityValue || 80,
-                            maxWidth: file.settings.maxWidth.toString(),
+                            maxWidth: file.settings.maxWidth ? file.settings.maxWidth.toString() : "",
                             format: file.settings.format || "original",
                             stripExif: file.settings.stripExif !== undefined ? file.settings.stripExif : true,
                         });

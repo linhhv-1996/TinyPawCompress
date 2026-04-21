@@ -1,6 +1,8 @@
 use image::{imageops::FilterType, DynamicImage, GrayImage, RgbImage};
 use lopdf::{Document, Object, SaveOptions}; // THÊM SaveOptions VÀO ĐÂY
 use rayon::prelude::*;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use rayon::ThreadPoolBuilder;
 use std::fs;
 use std::io::Cursor;
@@ -31,6 +33,7 @@ pub fn compress_pdf(
     strip_meta: bool,
     unlock_pdf: bool,
     password: &str,
+    cancel_flag: Arc<AtomicBool>,
 ) -> Result<(), String> {
     // 1. TẢI VÀ GIẢI MÃ BẰNG LOPDF
     // FIX 1: LUÔN dùng password nếu user có nhập, không phụ thuộc vào cờ unlock_pdf
@@ -88,6 +91,10 @@ pub fn compress_pdf(
     }
 
     for chunk in image_ids.chunks(4) {
+        if cancel_flag.load(Ordering::Relaxed) {
+            return Err("Cancelled".to_string());
+        }
+
         let mut tasks = Vec::new();
 
         for &id in chunk {
@@ -191,6 +198,10 @@ pub fn compress_pdf(
                 let _ = stream.compress();
             }
         }
+    }
+
+    if cancel_flag.load(Ordering::Relaxed) {
+        return Err("Cancelled".to_string());
     }
 
     // 5. LƯU PDF VỚI ĐIỀU KIỆN AN TOÀN
