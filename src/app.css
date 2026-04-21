@@ -27,10 +27,23 @@
     font-style: normal;
 }
 
-:root {
+/* :root {
     --bg-app: #FFFFFF;
     --sidebar-bg: #F3F4F6;
     --accent: #5E5CE6;
+    --text-main: #111827;
+    --text-dim: #6B7280;
+    --border: #D1D5DB;
+    --radius-lg: 10px;
+    --radius-md: 8px;
+    --success: #10B981;
+    --success-bg: #D1FAE5;
+} */
+
+:root {
+    --bg-app: #FFFFFF;
+    --sidebar-bg: #F3F4F6;
+    --accent: #111827; /* Đổi từ #5E5CE6 sang Đen đậm */
     --text-main: #111827;
     --text-dim: #6B7280;
     --border: #D1D5DB;
@@ -136,7 +149,7 @@ body {
     padding: 40px 80px;
     text-align: center;
     color: var(--accent);
-    background: rgba(94, 92, 230, 0.05);
+    background: rgba(17, 24, 39, 0.03); /* Chuyển về xám/đen nhạt */
     pointer-events: none;
     transform: scale(0.95);
     transition: transform 0.2s ease;
@@ -280,7 +293,7 @@ body {
 
 .file-card.active {
     border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent), 0 2px 6px rgba(94, 92, 230, 0.15);
+    box-shadow: 0 0 0 1px var(--accent), 0 2px 6px rgba(0, 0, 0, 0.1); 
 }
 
 .thumb {
@@ -542,7 +555,7 @@ body {
 
 .mac-input:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(94, 92, 230, 0.15);
+    box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.15);
 }
 
 .quality-box {
@@ -777,10 +790,10 @@ input:checked+.slider:before {
 }
 
 .pill-btn.active {
-    background: #EEF2FF;
+    background: #F3F4F6; /* Bỏ nền xanh #EEF2FF */
     border-color: var(--accent);
     color: var(--accent);
-    box-shadow: 0 1px 2px rgba(94, 92, 230, 0.1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 /* --- FOOTER & OUTPUT SECTION --- */
@@ -849,7 +862,7 @@ input:checked+.slider:before {
 }
 
 .btn-compress {
-    background: var(--accent);
+    background: var(--accent); /* Đã đổi thành Đen ở trên */
     color: white;
     border: none;
     padding: 10px;
@@ -863,23 +876,23 @@ input:checked+.slider:before {
     justify-content: center;
     align-items: center;
     gap: 6px;
-    box-shadow: 0 2px 4px rgba(94, 92, 230, 0.2);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15); /* Đổi bóng màu xanh thành đen mờ */
 }
 
 .btn-compress:hover {
-    background: #4C4AD9; /* Màu đậm hơn một chút so với accent  */
+    background: #374151; /* Màu xám đậm cho trạng thái hover */
     transition: background 0.1s ease-in-out;
-    box-shadow: 0 4px 6px rgba(94, 92, 230, 0.25);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
 }
 
 .btn-compress:active {
     transform: translateY(1px);
-    box-shadow: 0 1px 2px rgba(94, 92, 230, 0.15);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .batch-box {
-    background: #EEF2FF;
-    border: 1px solid #C7D2FE;
+    background: #F9FAFB; 
+    border: 1px solid #E5E7EB;
     border-radius: 8px;
     padding: 10px;
     margin-bottom: 16px;
@@ -902,12 +915,12 @@ input:checked+.slider:before {
 }
 
 .batch-text small {
-    display: block; /* Đổi thành block để có thể cắt chữ */
+    display: block; 
     font-size: 10px;
-    color: #6366F1;
+    color: var(--text-dim); /* Bỏ chữ xanh #6366F1 */
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis; /* Hiển thị dấu ... khi quá dài */
+    text-overflow: ellipsis; 
 }
 
 .title-btn-settings {
@@ -936,7 +949,7 @@ input:checked+.slider:before {
 
 /* Hiệu ứng khi đang mở cột Settings */
 .title-btn-settings.active {
-    background: #E0E7FF;
+    background: #F3F4F6; /* Bỏ nền xanh #E0E7FF */
     color: var(--accent);
 }
 
@@ -956,8 +969,8 @@ select.mac-input {
 
 .batch-btn {
     width: 100%;
-    background: #EEF2FF;
-    border: 1px solid #C7D2FE;
+    background: #F9FAFB;
+    border: 1px solid #E5E7EB;
     border-radius: 8px;
     padding: 8px;
     margin-bottom: 16px;
@@ -970,11 +983,11 @@ select.mac-input {
     color: var(--accent);
     font-size: 12px;
     font-weight: 600;
-    box-shadow: 0 1px 2px rgba(94, 92, 230, 0.05);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .batch-btn:hover {
-    background: #E0E7FF;
+    background: #F3F4F6;
 }
 
 .batch-btn.success {

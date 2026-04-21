@@ -85,21 +85,6 @@
 
 <aside class="sidebar">
     <div class="sidebar-scroll" style="{isCompressingAll ? 'pointer-events: none; opacity: 0.6;' : ''}">
-        {#if activePanel !== "empty"}
-            <button
-                class="batch-btn {isApplied ? 'success' : ''}"
-                on:click={handleApplyToAll}
-            >
-                {#if isApplied}
-                    <i class="ph ph-check-circle" style="font-size: 14px;"></i>
-                    <span>Applied to all {file.file_type.toUpperCase()}s!</span>
-                {:else}
-                    <i class="ph ph-copy" style="font-size: 14px;"></i>
-                    <span>Apply to all {file.file_type.toUpperCase()}s</span>
-                {/if}
-            </button>
-        {/if}
-
         {#if activePanel === "empty"}
             <div
                 class="panel active"
@@ -259,6 +244,25 @@
                 />
             </div>
         {/if}
+
+        {#if activePanel !== "empty" && filesCount > 1}
+            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--border);">
+                <button
+                    class="batch-btn {isApplied ? 'success' : ''}"
+                    on:click={handleApplyToAll}
+                    style="margin-bottom: 0;"
+                >
+                    {#if isApplied}
+                        <i class="ph ph-check-circle" style="font-size: 14px;"></i>
+                        <span>Applied to all {file.file_type.toUpperCase()}s!</span>
+                    {:else}
+                        <i class="ph ph-copy" style="font-size: 14px;"></i>
+                        <span>Apply to all {file.file_type.toUpperCase()}s</span>
+                    {/if}
+                </button>
+            </div>
+        {/if}
+        
     </div>
 
     {#if activePanel !== "empty"}

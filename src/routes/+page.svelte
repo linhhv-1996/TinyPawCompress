@@ -95,6 +95,11 @@
 
         if (uniquePaths.length === 0) return;
 
+        if (files.length + uniquePaths.length > 5) {
+            showProModal = true;
+            return;
+        }
+
         try {
             const newFiles: any[] = await invoke("handle_dropped_files", { paths: uniquePaths });
             
@@ -198,6 +203,17 @@
 
     // Thêm thư viện xử lý đường dẫn nếu cần, hoặc dùng regex cơ bản
     async function startCompression(event: CustomEvent<{ outputDir: string }>) {
+
+        try {
+            await invoke("check_compression_limit", { count: files.length });
+        } catch (err) {
+            if (err === "LIMIT_REACHED" || String(err).includes("LIMIT_REACHED")) {
+                showProModal = true;
+                return; 
+            }
+        }
+
+
         console.log("🚀 Bắt đầu nén...");
         isCompressingAll = true; 
         const outputDir = event.detail.outputDir;
@@ -472,7 +488,13 @@
             </p>
             
             <div class="control-group">
-                <div class="control-label">Enter License Key:</div>
+                <div class="control-label" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Enter License Key:</span>
+                    <a href="https://your-website.com/buy" target="_blank" rel="noopener noreferrer" class="buy-link" tabindex="-1">
+                        Get a key <i class="ph ph-arrow-up-right"></i>
+                    </a>
+                </div>
+                
                 <input 
                     type="text" 
                     class="mac-input" 
@@ -520,7 +542,7 @@
     .hero-icon {
         font-size: 48px;
         color: var(--accent);
-        background: #eef2ff;
+        background: #F9FAFB; /* Đổi nền xanh #eef2ff sang xám sáng */
         width: 80px;
         height: 80px;
         display: flex;
@@ -528,7 +550,7 @@
         justify-content: center;
         border-radius: 20px;
         margin: 0 auto 24px auto;
-        box-shadow: 0 4px 12px rgba(94, 92, 230, 0.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); /* Đổi đổ bóng xanh tím sang đen mờ */
     }
     .hero-box h2 {
         font-size: 17px;
@@ -639,5 +661,21 @@
     }
     .btn-cancel:hover { 
         background: #F3F4F6; 
+    }
+
+    .buy-link {
+        font-size: 11px;
+        color: var(--text-dim);
+        text-decoration: none;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        transition: color 0.2s ease;
+    }
+    
+    .buy-link:hover {
+        color: var(--accent); /* Sẽ dùng màu đen quyền lực bạn vừa đổi ban nãy */
+        text-decoration: underline;
     }
 </style>

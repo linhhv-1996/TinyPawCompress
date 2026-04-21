@@ -76,8 +76,6 @@ fn save_config(app_handle: &AppHandle, config: &AppConfig) {
     }
 }
 
-
-
 struct AppState {
     cancel_flags: Mutex<HashMap<String, Arc<AtomicBool>>>,
     app_config: Mutex<AppConfig>,
@@ -195,10 +193,6 @@ async fn handle_dropped_files(app: AppHandle, paths: Vec<String>, state: State<'
             if config.processed_files_count + incoming_count > free_limit {
                 return Err("LIMIT_REACHED".to_string()); // Ném lỗi về Svelte
             }
-
-            // Nếu hợp lệ, cộng dồn số lượng và lưu xuống ổ cứng
-            config.processed_files_count += incoming_count;
-            save_config(&app, &config);
         }
     }
 
@@ -290,6 +284,7 @@ async fn compress_video_command(
     target_size: f64,
     codec: String,
     mute_audio: bool,
+    app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<CompressResult, String> {
     
@@ -332,6 +327,14 @@ async fn compress_video_command(
         let meta = fs::metadata(&output_path).map_err(|e| format!("Lỗi đọc file Video mới: {}", e))?;
         let new_size_text = crate::utils::format_size(meta.len());
 
+        {
+            let mut config = state.app_config.lock().unwrap();
+            if !config.is_pro {
+                config.processed_files_count += 1;
+                save_config(&app, &config);
+            }
+        }
+
         Ok(CompressResult {
             id,
             success: true,
@@ -361,6 +364,7 @@ async fn compress_pdf_command(
     strip_meta: bool,
     unlock_pdf: bool, // THÊM NHẬN PARAM TỪ FRONTEND
     password: String, // THÊM NHẬN PARAM TỪ FRONTEND
+    app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<CompressResult, String> {
     // 1. Setup cờ Cancel
@@ -407,6 +411,14 @@ async fn compress_pdf_command(
             let meta = std::fs::metadata(&output_path).map_err(|e| format!("Error reading new file: {}", e))?;
             let new_size_text = crate::utils::format_size(meta.len());
 
+            {
+                let mut config = state.app_config.lock().unwrap();
+                if !config.is_pro {
+                    config.processed_files_count += 1;
+                    save_config(&app, &config);
+                }
+            }
+            
             Ok(CompressResult {
                 id,
                 success: true,
@@ -437,6 +449,7 @@ async fn compress_image_command(
     max_width: String,
     format: String,
     strip_exif: bool,
+    app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<CompressResult, String> {
     
@@ -481,6 +494,14 @@ async fn compress_image_command(
             let new_size_bytes = meta.len();
             let new_size_text = crate::utils::format_size(new_size_bytes);
 
+            {
+                let mut config = state.app_config.lock().unwrap();
+                if !config.is_pro {
+                    config.processed_files_count += 1;
+                    save_config(&app, &config);
+                }
+            }
+            
             Ok(CompressResult {
                 id,
                 success: true,
@@ -545,6 +566,17 @@ async fn verify_license(key: String, app: AppHandle, state: State<'_, AppState>)
     }
 }
 
+#[tauri::command]
+fn check_compression_limit(count: u32, state: State<'_, AppState>) -> Result<(), String> {
+    let config = state.app_config.lock().unwrap();
+    if !config.is_pro {
+        if config.processed_files_count + count > 5 {
+            return Err("LIMIT_REACHED".to_string());
+        }
+    }
+    Ok(())
+}
+
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -568,6 +600,7 @@ pub fn run() {
             compress_video_command,
             compress_image_command,
             cancel_compression_command,
+            check_compression_limit,
             get_pro_status,
             verify_license,
         ])
