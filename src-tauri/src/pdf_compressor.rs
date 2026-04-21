@@ -199,9 +199,6 @@ pub fn compress_pdf(
     // 5. LƯU PDF VỚI ĐIỀU KIỆN AN TOÀN
     {
         let mut file = fs::File::create(output_path).map_err(|e| format!("Lỗi tạo file: {}", e))?;
-        
-        // FIX 3: TẮT Object Streams nếu file đang có pass hoặc đã từng có pass.
-        // Điều này bypass hoàn toàn lỗi xung đột gây trắng file của lopdf.
         let safe_to_use_obj_streams = false;
 
         let options = SaveOptions::builder()
