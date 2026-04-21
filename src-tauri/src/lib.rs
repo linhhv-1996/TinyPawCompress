@@ -365,6 +365,8 @@ async fn compress_pdf_command(
     profile: String,
     grayscale: bool,
     strip_meta: bool,
+    unlock_pdf: bool, // THÊM NHẬN PARAM TỪ FRONTEND
+    password: String, // THÊM NHẬN PARAM TỪ FRONTEND
     state: tauri::State<'_, AppState>,
 ) -> Result<CompressResult, String> {
     // 1. Setup cờ Cancel
@@ -376,6 +378,9 @@ async fn compress_pdf_command(
         .insert(id.clone(), cancel_flag.clone());
 
     let output_clone = output_path.clone();
+    
+    // THÊM: Clone password để move vào luồng ngầm (tránh lỗi borrow checker)
+    let password_clone = password.clone(); 
 
     // 2. Chạy nén ngầm hoàn toàn bằng RUST (Bỏ Swift)
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -390,6 +395,8 @@ async fn compress_pdf_command(
             &profile,
             grayscale,
             strip_meta,
+            unlock_pdf,       // TRUYỀN XUỐNG
+            &password_clone,  // TRUYỀN XUỐNG DƯỚI DẠNG &str
         )
     })
     .await
@@ -400,7 +407,7 @@ async fn compress_pdf_command(
     // 3. Xử lý kết quả trả về
     match result {
         Ok(_) => {
-            let meta = fs::metadata(&output_path).map_err(|e| format!("Lỗi đọc file mới: {}", e))?;
+            let meta = std::fs::metadata(&output_path).map_err(|e| format!("Lỗi đọc file mới: {}", e))?;
             let new_size_text = crate::utils::format_size(meta.len());
 
             Ok(CompressResult {

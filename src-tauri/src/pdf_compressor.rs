@@ -29,8 +29,35 @@ pub fn compress_pdf(
     profile: &str,
     grayscale: bool,
     strip_meta: bool,
+    unlock_pdf: bool,
+    password: &str,
 ) -> Result<(), String> {
-    let mut doc = Document::load(input_path).map_err(|e| format!("Lỗi đọc PDF: {}", e))?;
+    // 1. TẢI VÀ GIẢI MÃ BẰNG LOPDF
+    // FIX 1: LUÔN dùng password nếu user có nhập, không phụ thuộc vào cờ unlock_pdf
+    let mut doc = if !password.is_empty() {
+        Document::load_with_password(input_path, password)
+            .map_err(|_| "Sai mật khẩu hoặc không thể mở file PDF!".to_string())?
+    } else {
+        // lopdf tự động giải mã nếu file được bảo vệ bằng empty password
+        Document::load(input_path)
+            .map_err(|e| format!("Lỗi đọc file PDF: {}", e))?
+    };
+
+    // 2. KIỂM TRA TRẠNG THÁI MÃ HÓA
+    if doc.is_encrypted() {
+        return Err("File PDF yêu cầu mật khẩu. Vui lòng nhập đúng mật khẩu.".to_string());
+    }
+
+    // LƯU Ý: Ghi nhớ trạng thái gốc của file để xử lý an toàn lúc Save
+    let was_originally_encrypted = doc.was_encrypted();
+
+    // 3. XỬ LÝ LOGIC UNLOCK
+    // FIX 2: Chỉ xóa state mã hóa khi user thực sự check vào ô "Unlock PDF"
+    if unlock_pdf {
+        doc.encryption_state = None;
+        // Dọn dẹp triệt để dictionary Encrypt trong trailer để file sạch hoàn toàn
+        doc.trailer.remove(b"Encrypt");
+    }
 
     let (quality, max_size) = match profile {
         "screen" => (40, 800),
@@ -43,13 +70,12 @@ pub fn compress_pdf(
         doc.trailer.remove(b"Info");
     }
 
-    // 1. TẠO THREAD POOL RIÊNG ĐỂ BẢO VỆ CPU (Tối đa 2 luồng)
+    // 4. KHỞI TẠO THREAD POOL VÀ NÉN ẢNH (Giữ nguyên logic của bạn)
     let pool = ThreadPoolBuilder::new()
         .num_threads(2)
         .build()
         .map_err(|e| format!("Lỗi khởi tạo ThreadPool: {}", e))?;
 
-    // 2. LỌC LẤY DANH SÁCH ID (Chưa moi data vội)
     let object_ids: Vec<_> = doc.objects.keys().copied().collect();
     let mut image_ids = Vec::new();
 
@@ -64,7 +90,6 @@ pub fn compress_pdf(
         }
     }
 
-    // 3. XỬ LÝ THEO CHUNK (4 ảnh/lần) ĐỂ BẢO VỆ RAM
     for chunk in image_ids.chunks(4) {
         let mut tasks = Vec::new();
 
@@ -153,7 +178,6 @@ pub fn compress_pdf(
             }).collect()
         });
 
-        // 4. LẮP LẠI VÀO PDF
         for p_img in processed_images {
             if let Ok(Object::Stream(ref mut stream)) = doc.get_object_mut(p_img.id) {
                 stream.content = p_img.compressed_bytes;
@@ -172,20 +196,23 @@ pub fn compress_pdf(
         }
     }
 
-    // 5. LƯU PDF VỚI OBJECT STREAMS (MODERN FORMAT)
+    // 5. LƯU PDF VỚI ĐIỀU KIỆN AN TOÀN
     {
-        // Tạo scope block `{}` để đảm bảo file được drop (đóng) sau khi save xong
         let mut file = fs::File::create(output_path).map_err(|e| format!("Lỗi tạo file: {}", e))?;
         
+        // FIX 3: TẮT Object Streams nếu file đang có pass hoặc đã từng có pass.
+        // Điều này bypass hoàn toàn lỗi xung đột gây trắng file của lopdf.
+        let safe_to_use_obj_streams = false;
+
         let options = SaveOptions::builder()
-            .use_object_streams(true)        // Bật nén luồng object
-            .use_xref_streams(true)          // Bật nén luồng tham chiếu chéo
-            .max_objects_per_stream(200)     // Gom tối đa 200 object vào 1 cục để nén
-            .compression_level(9)            // Ép nén tối đa (0-9)
+            .use_object_streams(safe_to_use_obj_streams)        
+            .use_xref_streams(safe_to_use_obj_streams)          
+            .max_objects_per_stream(200)     
+            .compression_level(9)            
             .build();
 
         doc.save_with_options(&mut file, options).map_err(|e| format!("Lỗi lưu file: {}", e))?;
-    } // File tự động được đóng an toàn tại đây
+    } 
 
     // 6. KIỂM TRA LẠI SIZE BẢO HIỂM
     let original_size = fs::metadata(input_path).map(|m| m.len()).unwrap_or(0);

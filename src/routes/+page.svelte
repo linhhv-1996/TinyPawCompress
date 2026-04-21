@@ -213,6 +213,8 @@
                             profile: file.settings.profile || "ebook",
                             grayscale: file.settings.grayscale || false,
                             stripMeta: file.settings.stripMeta || false,
+                            unlockPdf: file.settings.unlockPdf || false,
+                            password: file.settings.password || "",
                         });
                     } else if (file.file_type === "video") {
                         res = await invoke("compress_video_command", {

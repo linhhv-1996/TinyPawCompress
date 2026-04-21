@@ -197,29 +197,26 @@
                     bind:checked={file.settings.stripMeta}
                 />
 
-                <!-- <div class="control-group" style="margin-top: 12px;">
+                <div class="control-group" style="margin-top: 12px;">
                     <ToggleRow 
-                        iconClass="ph ph-key" 
-                        title={$lang.passwordProtect} 
-                        subtitle={$lang.passwordProtectDesc} 
-                        bind:checked={file.settings.passwordProtect} 
-                        hasInput={file.settings.passwordProtect} 
+                        iconClass="ph ph-lock-key-open" 
+                        title="Unlock PDF" 
+                        subtitle="Provide password if PDF is locked" 
+                        bind:checked={file.settings.unlockPdf} 
+                        hasInput={file.settings.unlockPdf} 
                     />
-                    <div
-                        class="conditional-wrap {file.settings.passwordProtect
-                            ? 'open'
-                            : ''}"
-                    >
+                    <div class="conditional-wrap {file.settings.unlockPdf ? 'open' : ''}">
                         <div class="conditional-input">
                             <input
                                 type="password"
                                 class="mac-input"
-                                placeholder={$lang.passwordPlaceholder}
+                                placeholder="Enter password to unlock..."
                                 bind:value={file.settings.password}
                             />
                         </div>
                     </div>
-                </div> -->
+                </div>
+
             </div>
         {/if}
 

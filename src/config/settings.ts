@@ -10,7 +10,7 @@ export interface PdfSettings {
     profile: string;
     grayscale: boolean;
     stripMeta: boolean;
-    passwordProtect: boolean;
+    unlockPdf: boolean;
     password?: string;
 }
 
@@ -38,8 +38,8 @@ export function getDefaultSettings(fileType: string) {
                 profile: 'screen',
                 grayscale: false,
                 stripMeta: true,
-                passwordProtect: false,
-                password: ''
+                unlockPdf: false,
+                password: ""
             } as PdfSettings;
             
         case 'image':
