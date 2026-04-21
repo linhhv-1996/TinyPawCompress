@@ -15,16 +15,21 @@ use swift_rs::{swift, SRString};
 
 swift!(fn get_pdf_meta_swift(path: &SRString) -> SRString);
 swift!(fn generate_pdf_thumbnail_swift(path: &SRString) -> SRString);
+swift!(fn compress_pdf_swift(args: &SRString) -> SRString);
+
 swift!(fn get_image_meta_swift(path: &SRString) -> SRString);
 swift!(fn generate_image_thumbnail_swift(path: &SRString) -> SRString);
+swift!(fn compress_image_swift(args: &SRString) -> SRString);
+
 swift!(fn get_video_meta_swift(path: &SRString) -> SRString);
 swift!(fn generate_video_thumbnail_swift(path: &SRString) -> SRString);
 swift!(fn compress_video_swift(args: &SRString) -> SRString);
+
 swift!(fn cancel_video_swift(id: &SRString));
 
 
-mod pdf_compressor;
 mod utils;
+mod pdf_compressor;
 
 struct AppState {
     cancel_flags: Mutex<HashMap<String, Arc<AtomicBool>>>,
@@ -196,69 +201,6 @@ async fn handle_dropped_files(app: AppHandle, paths: Vec<String>) -> Vec<AppFile
     files // Trả về danh sách ngay lập tức
 }
 
-#[tauri::command]
-async fn compress_pdf_command(
-    id: String,
-    input_path: String,
-    output_path: String,
-    profile: String,
-    grayscale: bool,
-    strip_meta: bool,
-    state: tauri::State<'_, AppState>,
-) -> Result<CompressResult, String> {
-    // 1. Setup cờ Cancel
-    let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    state
-        .cancel_flags
-        .lock()
-        .unwrap()
-        .insert(id.clone(), cancel_flag.clone());
-
-    let options = crate::pdf_compressor::PdfCompressOptions {
-        profile,
-        grayscale,
-        strip_meta,
-    };
-    let output_clone = output_path.clone();
-
-    // 2. Chạy nén ngầm
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        crate::pdf_compressor::compress_pdf(&input_path, &output_clone, options, cancel_flag)
-    })
-    .await
-    .map_err(|e| format!("Crash luồng nén: {}", e))?; // Lỗi panic của thread
-
-    state.cancel_flags.lock().unwrap().remove(&id);
-
-    // 3. Xử lý kết quả trả về
-    match result {
-        Ok(_) => {
-            // Lấy size file mới nén xong
-            let meta =
-                fs::metadata(&output_path).map_err(|e| format!("Lỗi đọc file mới: {}", e))?;
-            let new_size_text = crate::utils::format_size(meta.len()); // Dùng lại hàm format_size của mày
-
-            Ok(CompressResult {
-                id,
-                success: true,
-                new_size_bytes: meta.len(),
-                new_size_text,
-                error_msg: String::new(),
-            })
-        }
-        Err(e) => {
-            // Vẫn trả về Ok(CompressResult) để FE dễ hứng JSON, nhưng success = false
-            Ok(CompressResult {
-                id,
-                success: false,
-                new_size_bytes: 0,
-                new_size_text: String::new(),
-                error_msg: e,
-            })
-        }
-    }
-}
-
 
 #[tauri::command]
 async fn compress_video_command(
@@ -332,19 +274,172 @@ async fn compress_video_command(
 }
 
 
-// Command này để FE gọi khi user bấm nút [X] Cancel
 #[tauri::command]
-fn cancel_compression_command(id: String, state: State<'_, AppState>) {
-    // 1. Đặt cờ cho Rust (để dừng các task chưa kịp chạy)
+async fn compress_image_command(
+    id: String,
+    input_path: String,
+    output_path: String,
+    quality_value: u8,
+    max_width: String,
+    format: String,
+    strip_exif: bool,
+    state: tauri::State<'_, AppState>,
+) -> Result<CompressResult, String> {
+    
+    // 1. Setup cờ Cancel
+    let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    state
+        .cancel_flags
+        .lock()
+        .unwrap()
+        .insert(id.clone(), cancel_flag.clone());
+
+    // 2. Gom tham số thành JSON để đẩy xuống Swift
+    let json_args = serde_json::json!({
+        "inputPath": input_path,
+        "outputPath": output_path,
+        "qualityValue": quality_value,
+        "maxWidth": max_width,
+        "format": format,
+        "stripExif": strip_exif,
+    }).to_string();
+
+    // 3. Chạy luồng ngầm xử lý nén qua Swift
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        // Kiểm tra xem User có bấm Cancel trong lúc chờ tới lượt không
+        if cancel_flag.load(Ordering::Relaxed) {
+            return "Cancelled".to_string();
+        }
+
+        let sr_args = SRString::from(json_args.as_str());
+        let swift_res = unsafe { compress_image_swift(&sr_args) };
+        swift_res.as_str().to_string()
+    })
+    .await
+    .map_err(|e| format!("Crash luồng nén Image: {}", e))?;
+
+    // 4. Hoàn tất xử lý, dọn dẹp cờ Cancel
+    state.cancel_flags.lock().unwrap().remove(&id);
+
+    // 5. Xử lý kết quả trả về từ Swift
+    if result == "SUCCESS" || result == "SKIPPED_BIGGER" {
+        // Nếu SKIPPED_BIGGER, file output thực chất là file gốc được Swift copy đè sang
+        // => Size mới sẽ y hệt size cũ, Frontend sẽ tự tính ra là giảm 0%.
+        let meta = fs::metadata(&output_path).map_err(|e| format!("Lỗi đọc file ảnh mới: {}", e))?;
+        let new_size_bytes = meta.len();
+        let new_size_text = crate::utils::format_size(new_size_bytes);
+
+        Ok(CompressResult {
+            id,
+            success: true,
+            new_size_bytes,
+            new_size_text,
+            error_msg: String::new(),
+        })
+    } else if result == "Cancelled" {
+        // Trường hợp bị huỷ (User bấm X)
+        Ok(CompressResult {
+            id,
+            success: false,
+            new_size_bytes: 0,
+            new_size_text: String::new(),
+            error_msg: result, // Truyền thẳng chữ "Cancelled" lên UI để Frontend ẩn màu đỏ
+        })
+    } else {
+        // Lỗi thật sự (Ví dụ: Format WebP không hỗ trợ trên macOS cũ, đường dẫn hỏng...)
+        Ok(CompressResult {
+            id,
+            success: false,
+            new_size_bytes: 0,
+            new_size_text: String::new(),
+            error_msg: result, 
+        })
+    }
+}
+
+
+#[tauri::command]
+async fn compress_pdf_command(
+    id: String,
+    input_path: String,
+    output_path: String,
+    profile: String,
+    grayscale: bool,
+    strip_meta: bool,
+    state: tauri::State<'_, AppState>,
+) -> Result<CompressResult, String> {
+    // 1. Setup cờ Cancel
+    let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    state
+        .cancel_flags
+        .lock()
+        .unwrap()
+        .insert(id.clone(), cancel_flag.clone());
+
+    let output_clone = output_path.clone();
+
+    // 2. Chạy nén ngầm hoàn toàn bằng RUST (Bỏ Swift)
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        if cancel_flag.load(Ordering::Relaxed) {
+            return Err("Cancelled".to_string());
+        }
+
+        // Gọi logic nén PDF từ file pdf_compressor.rs
+        crate::pdf_compressor::compress_pdf(
+            &input_path,
+            &output_clone,
+            &profile,
+            grayscale,
+            strip_meta,
+        )
+    })
+    .await
+    .map_err(|e| format!("Crash luồng nén PDF: {}", e))?;
+
+    state.cancel_flags.lock().unwrap().remove(&id);
+
+    // 3. Xử lý kết quả trả về
+    match result {
+        Ok(_) => {
+            let meta = fs::metadata(&output_path).map_err(|e| format!("Lỗi đọc file mới: {}", e))?;
+            let new_size_text = crate::utils::format_size(meta.len());
+
+            Ok(CompressResult {
+                id,
+                success: true,
+                new_size_bytes: meta.len(),
+                new_size_text,
+                error_msg: String::new(),
+            })
+        }
+        Err(err_msg) => {
+            Ok(CompressResult {
+                id,
+                success: false,
+                new_size_bytes: 0,
+                new_size_text: String::new(),
+                error_msg: err_msg,
+            })
+        }
+    }
+}
+
+
+#[tauri::command]
+fn cancel_compression_command(id: String, file_type: String, state: State<'_, AppState>) {
+    // 1. Đặt cờ cho Rust (để dừng các task đang ở hàng đợi, chưa kịp gọi xuống Swift)
     if let Some(flag) = state.cancel_flags.lock().unwrap().get(&id) {
         flag.store(true, Ordering::Relaxed);
     }
     
-    // 2. Bắn lệnh chọc thẳng xuống Swift để giết cái Export Session đang chạy ngầm
-    let sr_id = SRString::from(id.as_str());
-    unsafe { cancel_video_swift(&sr_id) };
+    // 2. Chỉ can thiệp sâu xuống Swift nếu đó là Video
+    if file_type == "video" {
+        let sr_id = SRString::from(id.as_str());
+        unsafe { cancel_video_swift(&sr_id) };
+    }
+    // Với PDF, quá trình write() của macOS chạy đồng bộ rất nhanh và không hỗ trợ ngắt giữa chừng,
+    // nên ta không gọi cancel_pdf_swift, nó sẽ tự xong trong chốc lát và trả kết quả.
 }
-
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -358,6 +453,7 @@ pub fn run() {
             handle_dropped_files,
             compress_pdf_command,
             compress_video_command,
+            compress_image_command,
             cancel_compression_command,
         ])
         .run(tauri::generate_context!())

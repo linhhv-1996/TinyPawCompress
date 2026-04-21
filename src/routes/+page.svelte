@@ -174,7 +174,7 @@
 
         // 1. Đổi UI sang trạng thái "compressing" cho file PDF và Video
         files = files.map((f) => {
-            if (f.file_type === "pdf" || f.file_type === "video") {
+            if (f.file_type === "pdf" || f.file_type === "video" || f.file_type === "image") {
                 return { ...f, status: "compressing", afterStat: '', savedPercent: '' };
             }
             return f;
@@ -182,8 +182,7 @@
 
         // 2. Chạy hàng đợi p-limit
         const compressTasks = files.map((file) => {
-            // BỎ QUA các file không phải pdf hoặc video
-            if (file.file_type !== "pdf" && file.file_type !== "video") return Promise.resolve(); 
+            if (file.file_type !== "pdf" && file.file_type !== "video" && file.file_type !== "image") return Promise.resolve();
 
             return limit(async () => {
                 if (!isCompressingAll) {
@@ -192,7 +191,13 @@
                 }
 
                 const oldNameStr = file.name.replace(/\.[^/.]+$/, "");
-                const ext = file.name.split('.').pop();
+                let ext = file.name.split('.').pop();
+
+                if (file.file_type === "image") {
+                    if (file.settings.format === "jpeg") ext = "jpg";
+                    else if (file.settings.format === "webp") ext = "webp";
+                }
+
                 const newFileName = `${oldNameStr}_compressed.${ext}`;
 
                 try {
@@ -218,6 +223,17 @@
                             targetSize: parseFloat(file.settings.targetSize) || 0.0,
                             codec: file.settings.codec || "h264",
                             muteAudio: file.settings.muteAudio || false,
+                        });
+                    } else if (file.file_type === "image") {
+                        // GỌI XUỐNG RUST COMMAND NÉN ẢNH
+                        res = await invoke("compress_image_command", {
+                            id: file.id,
+                            inputPath: file.path,
+                            outputPath: outPath,
+                            qualityValue: file.settings.qualityValue || 80,
+                            maxWidth: file.settings.maxWidth.toString(),
+                            format: file.settings.format || "original",
+                            stripExif: file.settings.stripExif !== undefined ? file.settings.stripExif : true,
                         });
                     }
 
@@ -245,7 +261,11 @@
         // Gửi lệnh Cancel tới Rust cho những file ĐANG CHẠY
         for (const file of files) {
             if (file.status === "compressing") {
-                await invoke("cancel_compression_command", { id: file.id });
+                // Truyền thêm fileType xuống Rust
+                await invoke("cancel_compression_command", { 
+                    id: file.id, 
+                    fileType: file.file_type 
+                });
             }
         }
     }
