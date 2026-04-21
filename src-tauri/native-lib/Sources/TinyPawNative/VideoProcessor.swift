@@ -96,7 +96,7 @@ public class VideoProcessor {
     public static func compressVideo(jsonArgs: String) -> String {
         guard let jsonData = jsonArgs.data(using: .utf8),
               let options = try? JSONDecoder().decode(VideoCompressOptions.self, from: jsonData) else {
-            return "Lỗi: Không thể đọc cấu hình nén."
+            return "Error: Unable to read compression configuration."
         }
         
         let inputURL = URL(fileURLWithPath: options.inputPath)
@@ -115,13 +115,13 @@ public class VideoProcessor {
             let composition = AVMutableComposition()
             guard let compositionVideoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
                   let sourceVideoTrack = asset.tracks(withMediaType: .video).first else {
-                return "Lỗi: Lỗi xử lý Mute Audio."
+                return "Error: Mute audio processing error."
             }
             do {
                 try compositionVideoTrack.insertTimeRange(CMTimeRangeMake(start: .zero, duration: asset.duration), of: sourceVideoTrack, at: .zero)
                 exportAsset = composition
             } catch {
-                return "Lỗi: Xóa âm thanh thất bại."
+                return "Error: Failed to delete audio"
             }
         }
         
@@ -159,7 +159,7 @@ public class VideoProcessor {
         }
         
         guard let exportSession = AVAssetExportSession(asset: exportAsset, presetName: presetName) else {
-            return "Lỗi: Thiết bị không hỗ trợ định dạng nén này."
+            return "Error: Device does not support this compression format."
         }
         
         exportSession.outputURL = outputURL
@@ -210,11 +210,11 @@ public class VideoProcessor {
         case .completed:
             return "SUCCESS"
         case .failed:
-            return "Lỗi: \(exportSession.error?.localizedDescription ?? "Không xác định")"
+            return "Error: \(exportSession.error?.localizedDescription ?? "Unknown")"
         case .cancelled:
             return "Cancelled" // SỬA THÀNH CHỮ "Cancelled" CHO KHỚP VỚI LOGIC CỦA SVELTE FE
         default:
-            return "Lỗi hệ thống."
+            return "System error."
         }
     }
 }

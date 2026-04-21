@@ -58,7 +58,7 @@ public class ImageProcessor {
               let args = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
               let inputPath = args["inputPath"] as? String,
               let outputPath = args["outputPath"] as? String else {
-            return "Lỗi đọc dữ liệu truyền vào"
+            return "Error reading input data"
         }
         
         // Ép sang NSNumber để ImageIO đọc được đúng tham số Quality
@@ -109,13 +109,13 @@ public class ImageProcessor {
         }
         
         guard let cgImage = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, decodeOptions as CFDictionary) else {
-            return "Lỗi render xử lý điểm ảnh"
+            return "Error: Pixel processing failed during rendering"
         }
         
         // 3. KHỞI TẠO FILE DESTINATION
         guard let destination = CGImageDestinationCreateWithURL(outputURL as CFURL, outputUTI, 1, nil) else {
-            if format == "webp" { return "Lỗi: Phiên bản macOS này không hỗ trợ lưu WebP" }
-            return "Không thể khởi tạo file xuất"
+            if format == "webp" { return "Error: This version of macOS does not support saving WebP." }
+            return "Unable to initialize export file."
         }
         
         // Cấu hình Nén Lossy BẮT BUỘC dùng NSNumber
@@ -138,7 +138,7 @@ public class ImageProcessor {
         CGImageDestinationAddImage(destination, cgImage, writeOptions as CFDictionary)
         
         if !CGImageDestinationFinalize(destination) {
-            return "Lỗi trong quá trình ghi dữ liệu ra ổ cứng"
+            return "Error writing data to the hard drive."
         }
         
         // ---------------------------------------------------------

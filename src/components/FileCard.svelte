@@ -24,11 +24,14 @@
     export let infoIcon: string;
     export let infoText: string;
 
+    export let isError: boolean = false;
+    export let errorMessage: string = '';
+
     const dispatch = createEventDispatcher();
     
 </script>
 
-<div class="file-card {isActive ? 'active' : ''} {isProcessing ? 'processing' : ''} {isDone ? 'done' : ''}">
+<div class="file-card {isActive ? 'active' : ''} {isProcessing ? 'processing' : ''} {isDone ? 'done' : ''} {isError ? 'error-card' : ''}">
     <!-- svelte-ignore a11y_consider_explicit_label -->
     {#if !isGlobalProcessing}
         <button class="btn-delete" on:click|stopPropagation={() => dispatch('delete')}>
@@ -53,34 +56,80 @@
 
     <div class="card-info">
         <div class="badge-wrap">
-            <span class="type-badge" style="background: {badgeBg}; color: {badgeColor};">
-                {badgeText}
+            <span class="type-badge" style="background: {isError ? '#FEE2E2' : badgeBg}; color: {isError ? '#991B1B' : badgeColor};">
+                {isError ? 'ERROR' : badgeText}
             </span>
         </div>
 
-        <div class="fname">{filename}</div>
+        <div class="fname" style="{isError ? 'color: #DC2626;' : ''}">{filename}</div>
+        
         <div class="fmeta">
-            <div>
-                <span class="before-stat">{beforeStat}</span>
-                {#if isDone && afterStat}
-                    <span class="after-stat" style="color: #059669; font-weight: 600;">
-                        ➔ {afterStat}
-                        {#if savedPercent}
-                            <span class="badge-saved" style="margin-left: 4px; font-size: 11px; background: #D1FAE5; padding: 2px 4px; border-radius: 4px;">
-                                {savedPercent}
-                            </span>
-                        {/if}
-                    </span>
-                {/if}
-            </div>
-            <div class="res-info">
-                <i class="{infoIcon}"></i> {infoText}
-            </div>
+            {#if isError}
+                <div class="error-banner" title={errorMessage}>
+                    <i class="ph-fill ph-warning-circle"></i>
+                    <span class="error-text">{errorMessage}</span>
+                </div>
+            {:else}
+                <div>
+                    <span class="before-stat">{beforeStat}</span>
+                    {#if isDone && afterStat}
+                        <span class="after-stat" style="color: #059669; font-weight: 600;">
+                            ➔ {afterStat}
+                            {#if savedPercent}
+                                <span class="badge-saved" style="margin-left: 4px; font-size: 11px; background: #D1FAE5; padding: 2px 4px; border-radius: 4px;">
+                                    {savedPercent}
+                                </span>
+                            {/if}
+                        </span>
+                    {/if}
+                </div>
+                <div class="res-info">
+                    <i class="{infoIcon}"></i> {infoText}
+                </div>
+            {/if}
         </div>
     </div>
 </div>
 
 <style>
+    /* Viền thẻ màu đỏ nhạt khi có lỗi */
+    .file-card.error-card {
+        border-color: #FCA5A5;
+        background: #FEF2F2;
+    }
+
+    .file-card.error-card .card-info {
+        background: #FEF2F2;
+    }
+
+    /* Kiểu dáng cho Error Banner */
+    .error-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        margin-top: 2px;
+        padding: 6px 8px;
+        background: #FFFFFF; /* Nền trắng cho nổi bật trên background đỏ nhạt của card */
+        border: 1px solid #FCA5A5;
+        border-radius: 6px;
+        color: #DC2626;
+    }
+
+    .error-banner i {
+        font-size: 14px;
+        margin-top: 1px;
+    }
+
+    .error-text {
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1.3;
+        display: -webkit-box;
+        -webkit-line-clamp: 2; /* Chỉ hiển thị tối đa 2 dòng, quá dài sẽ có dấu ... */
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
     .spinner {
         animation: spin 1s linear infinite;
     }

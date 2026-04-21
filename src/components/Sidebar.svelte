@@ -18,6 +18,12 @@
 
     $: activePanel = file ? file.file_type : "empty";
 
+    $: if (file && file.file_type === "pdf" && file.settings) {
+        if (!file.settings.unlockPdf && file.settings.password !== "") {
+            file.settings.password = "";
+        }
+    }
+
     // --- LOGIC MỚI CHO NÚT BẤM ---
     let isApplied = false;
 

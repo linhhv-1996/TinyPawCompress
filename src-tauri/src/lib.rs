@@ -407,7 +407,7 @@ async fn compress_pdf_command(
     // 3. Xử lý kết quả trả về
     match result {
         Ok(_) => {
-            let meta = std::fs::metadata(&output_path).map_err(|e| format!("Lỗi đọc file mới: {}", e))?;
+            let meta = std::fs::metadata(&output_path).map_err(|e| format!("Error reading new file: {}", e))?;
             let new_size_text = crate::utils::format_size(meta.len());
 
             Ok(CompressResult {

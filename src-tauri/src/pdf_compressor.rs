@@ -36,20 +36,17 @@ pub fn compress_pdf(
     // FIX 1: LUÔN dùng password nếu user có nhập, không phụ thuộc vào cờ unlock_pdf
     let mut doc = if !password.is_empty() {
         Document::load_with_password(input_path, password)
-            .map_err(|_| "Sai mật khẩu hoặc không thể mở file PDF!".to_string())?
+            .map_err(|_| "Incorrect password or unable to open PDF file!".to_string())?
     } else {
         // lopdf tự động giải mã nếu file được bảo vệ bằng empty password
         Document::load(input_path)
-            .map_err(|e| format!("Lỗi đọc file PDF: {}", e))?
+            .map_err(|e| format!("Error reading PDF file: {}", e))?
     };
 
     // 2. KIỂM TRA TRẠNG THÁI MÃ HÓA
     if doc.is_encrypted() {
-        return Err("File PDF yêu cầu mật khẩu. Vui lòng nhập đúng mật khẩu.".to_string());
+        return Err("This PDF is password protected. Please enter the correct password.".to_string());
     }
-
-    // LƯU Ý: Ghi nhớ trạng thái gốc của file để xử lý an toàn lúc Save
-    let was_originally_encrypted = doc.was_encrypted();
 
     // 3. XỬ LÝ LOGIC UNLOCK
     // FIX 2: Chỉ xóa state mã hóa khi user thực sự check vào ô "Unlock PDF"
@@ -74,7 +71,7 @@ pub fn compress_pdf(
     let pool = ThreadPoolBuilder::new()
         .num_threads(2)
         .build()
-        .map_err(|e| format!("Lỗi khởi tạo ThreadPool: {}", e))?;
+        .map_err(|e| format!("Failed to initialize ThreadPool: {}", e))?;
 
     let object_ids: Vec<_> = doc.objects.keys().copied().collect();
     let mut image_ids = Vec::new();
@@ -198,7 +195,7 @@ pub fn compress_pdf(
 
     // 5. LƯU PDF VỚI ĐIỀU KIỆN AN TOÀN
     {
-        let mut file = fs::File::create(output_path).map_err(|e| format!("Lỗi tạo file: {}", e))?;
+        let mut file = fs::File::create(output_path).map_err(|e| format!("Error creating file: {}", e))?;
         let safe_to_use_obj_streams = false;
 
         let options = SaveOptions::builder()
@@ -208,7 +205,7 @@ pub fn compress_pdf(
             .compression_level(9)            
             .build();
 
-        doc.save_with_options(&mut file, options).map_err(|e| format!("Lỗi lưu file: {}", e))?;
+        doc.save_with_options(&mut file, options).map_err(|e| format!("Error saving file: {}", e))?;
     } 
 
     // 6. KIỂM TRA LẠI SIZE BẢO HIỂM

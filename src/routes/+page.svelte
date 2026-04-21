@@ -303,10 +303,7 @@
                     return {
                         ...f,
                         status: "error",
-                        metadata: `Lỗi: ${extraData}`, // Ghi đè dòng metadata bằng lỗi
-                        // dynamicBadgeText: "ERROR",
-                        // dynamicBadgeBg: "#FEE2E2", // Đỏ
-                        // dynamicBadgeColor: "#991B1B",
+                        errorMsg: extraData,
                     };
                 }
             }
@@ -387,6 +384,8 @@
                             isActive={selectedId === file.id}
                             isDone={file.status === 'done'}
                             isProcessing={file.status === 'compressing'}
+                            isError={file.status === 'error'} 
+                            errorMessage={file.errorMsg}
                             isGlobalProcessing={isCompressingAll}
                             filename={file.name}
                             beforeStat={file.size_text}
