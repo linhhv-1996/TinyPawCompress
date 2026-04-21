@@ -17,6 +17,11 @@
     let showSettings = false;
     let isCompressingAll = false;
 
+    let showProModal = false;
+    let licenseInput = "";
+    let licenseError = "";
+    let isVerifying = false;
+
     const limit = pLimit(1);
     let pendingThumbs = new Map<string, string>();
 
@@ -90,35 +95,61 @@
 
         if (uniquePaths.length === 0) return;
 
-        // Gọi Rust lấy thông tin cơ bản ngay lập tức (không đợi thumbnail)
-        const newFiles: any[] = await invoke("handle_dropped_files", { paths: uniquePaths });
+        try {
+            const newFiles: any[] = await invoke("handle_dropped_files", { paths: uniquePaths });
+            
+            const filesWithSettings = newFiles.map((f) => ({
+                ...f,
+                settings: getDefaultSettings(f.file_type),
+            }));
 
-        const filesWithSettings = newFiles.map((f) => ({
-            ...f,
-            settings: getDefaultSettings(f.file_type),
-        }));
+            files = [...files, ...filesWithSettings];
 
-        // Cập nhật danh sách hiển thị ngay để user không phải chờ
-        files = [...files, ...filesWithSettings];
+            files = files.map((f) => {
+                if (pendingThumbs.has(f.id)) {
+                    const thumbData = pendingThumbs.get(f.id);
+                    pendingThumbs.delete(f.id);
+                    return { ...f, thumbnail: thumbData };
+                }
+                return f;
+            });
 
-        files = files.map((f) => {
-            if (pendingThumbs.has(f.id)) {
-                const thumbData = pendingThumbs.get(f.id);
-                pendingThumbs.delete(f.id); // Lấy xong thì xóa khỏi phòng chờ
-                return { ...f, thumbnail: thumbData };
+            if (!selectedId && files.length > 0) selectedId = files[0].id;
+
+            newFiles.forEach(async (file) => {
+                if (file.file_type === "video") {
+                    const thumb = await createVideoThumbnail(file.path);
+                    if (thumb) updateFileThumbnail(file.id, thumb);
+                }
+            });
+
+        } catch (err) {
+            // Bắt lỗi từ Rust trả về
+            if (err === "LIMIT_REACHED") {
+                showProModal = true; // Bật Popup Paywall
+            } else {
+                console.error("Lỗi thêm file:", err);
             }
-            return f;
-        });
+        }
+    }
 
-        if (!selectedId && files.length > 0) selectedId = files[0].id;
-
-        // Với Video: Tự xử lý thumbnail ở FE để giảm tải cho Rust
-        newFiles.forEach(async (file) => {
-            if (file.file_type === "video") {
-                const thumb = await createVideoThumbnail(file.path);
-                if (thumb) updateFileThumbnail(file.id, thumb);
+    // Hàm gọi xuống Rust để kiểm tra Key
+    async function submitLicense() {
+        if (!licenseInput) return;
+        isVerifying = true;
+        licenseError = "";
+        try {
+            const success = await invoke("verify_license", { key: licenseInput });
+            if (success) {
+                showProModal = false;
+                // Sửa dòng alert dưới đây:
+                alert("Upgraded to Pro successfully! Enjoy unlimited compressions 🚀");
             }
-        });
+        } catch (err) {
+            licenseError = String(err);
+        } finally {
+            isVerifying = false;
+        }
     }
 
     // Hàm tạo thumbnail video bằng Canvas (Chạy ngầm)
@@ -350,7 +381,7 @@
                         <i class="ph ph-hand-grabbing"></i>
                     </div>
                     <h2>{$lang.emptyMainHint}</h2>
-                    <p>Supports MP4, PDF, JPG, PNG and more</p>
+                    <p>Supports MP4, MOV, PDF, JPG, PNG, WEBP</p>
                 </div>
             </div>
         {:else}
@@ -424,6 +455,55 @@
     {/if}
 </div>
 
+
+{#if showProModal}
+    <div class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Upgrade to TinyPaw Pro 🐾</h2>
+                <button class="close-btn" on:click={() => showProModal = false} disabled={isVerifying}>
+                    <i class="ph ph-x"></i>
+                </button>
+            </div>
+            
+            <p class="modal-desc">
+                The free version allows processing up to 5 files.<br/>
+                You've reached the limit! Upgrade now for unlimited usage.
+            </p>
+            
+            <div class="control-group">
+                <div class="control-label">Enter License Key:</div>
+                <input 
+                    type="text" 
+                    class="mac-input" 
+                    placeholder="e.g., TINYPAW-PRO" 
+                    bind:value={licenseInput}
+                    disabled={isVerifying}
+                />
+                {#if licenseError}
+                    <p class="error-text">
+                        <i class="ph-fill ph-warning-circle"></i> {licenseError}
+                    </p>
+                {/if}
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn-cancel" on:click={() => showProModal = false} disabled={isVerifying}>
+                    Maybe Later
+                </button>
+                <button class="btn-compress" on:click={submitLicense} disabled={isVerifying}>
+                    {#if isVerifying}
+                        <i class="ph ph-spinner-gap spinner"></i> Verifying...
+                    {:else}
+                        Activate Now
+                    {/if}
+                </button>
+            </div>
+        </div>
+    </div>
+{/if}
+
+
 <style>
     /* CSS cho vùng trung tâm mới */
     .empty-hero {
@@ -463,5 +543,101 @@
     }
     .clear-all {
         cursor: pointer;
+    }
+
+    /* CSS CHO MODAL PRO GATE */
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(4px);
+    }
+    
+    .modal-content {
+        background: #FFFFFF;
+        padding: 24px;
+        border-radius: 12px;
+        width: 400px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        animation: modalFadeIn 0.2s ease-out;
+    }
+    
+    @keyframes modalFadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+    
+    .modal-header h2 {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-main);
+    }
+    
+    .close-btn {
+        background: transparent;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        color: var(--text-dim);
+        transition: color 0.2s;
+    }
+    
+    .close-btn:hover {
+        color: var(--text-main);
+    }
+    
+    .modal-desc {
+        font-size: 13px;
+        color: var(--text-dim);
+        margin-bottom: 20px;
+        line-height: 1.5;
+    }
+    
+    .error-text {
+        color: #DC2626;
+        font-size: 12px;
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .modal-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 24px;
+    }
+    
+    .modal-actions button {
+        flex: 1;
+        padding: 10px 0;
+        justify-content: center;
+    }
+    
+    /* Ghi đè style của class .btn-cancel (nếu chưa có sẵn ở trang này) */
+    .btn-cancel {
+        background: #FFFFFF; 
+        border: 1px solid var(--border); 
+        border-radius: 6px; 
+        font-size: 13px; 
+        font-weight: 500; 
+        color: var(--text-main);
+        cursor: pointer; 
+        transition: all 0.2s ease; 
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    .btn-cancel:hover { 
+        background: #F3F4F6; 
     }
 </style>

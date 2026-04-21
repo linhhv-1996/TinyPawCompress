@@ -3,6 +3,27 @@
 version = 4
 
 [[package]]
+name = "TinyPaw"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "image",
+ "libcaesium",
+ "lopdf",
+ "pdfium-render",
+ "rayon",
+ "serde",
+ "serde_json",
+ "swift-rs",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-opener",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4909,27 +4930,6 @@ dependencies = [
  "webview2-com",
  "window-vibrancy",
  "windows",
-]
-
-[[package]]
-name = "tauri-app"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "image",
- "libcaesium",
- "lopdf",
- "pdfium-render",
- "rayon",
- "serde",
- "serde_json",
- "swift-rs",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-opener",
- "tokio",
- "uuid",
 ]
 
 [[package]]

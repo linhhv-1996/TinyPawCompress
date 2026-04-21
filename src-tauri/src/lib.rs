@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use tauri::State;
 use tauri::{path::BaseDirectory, AppHandle, Emitter, Manager}; // Dùng Emitter để gửi event về UI
@@ -30,8 +30,57 @@ mod utils;
 mod pdf_compressor;
 mod image_compressor;
 
+// ==========================================
+// 1. TẠO STRUCT LƯU TRỮ CẤU HÌNH (PRO GATE)
+// ==========================================
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AppConfig {
+    pub is_pro: bool,
+    pub processed_files_count: u32,
+    pub license_key: Option<String>,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            is_pro: false,
+            processed_files_count: 0,
+            license_key: None,
+        }
+    }
+}
+
+// Hàm phụ trợ lấy đường dẫn file config ẩn của hệ điều hành
+// macOS: ~/Library/Application Support/com.tinypaw.app/config.json
+fn get_config_path(app_handle: &AppHandle) -> PathBuf {
+    let app_dir = app_handle.path().app_data_dir().expect("Lỗi đọc thư mục AppData");
+    if !app_dir.exists() {
+        fs::create_dir_all(&app_dir).unwrap();
+    }
+    app_dir.join("config.json")
+}
+
+fn load_config(app_handle: &AppHandle) -> AppConfig {
+    let path = get_config_path(app_handle);
+    if let Ok(content) = fs::read_to_string(&path) {
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        AppConfig::default()
+    }
+}
+
+fn save_config(app_handle: &AppHandle, config: &AppConfig) {
+    let path = get_config_path(app_handle);
+    if let Ok(content) = serde_json::to_string_pretty(config) {
+        let _ = fs::write(path, content);
+    }
+}
+
+
+
 struct AppState {
     cancel_flags: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    app_config: Mutex<AppConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -116,13 +165,44 @@ fn generate_video_thumbnail(path: &str) -> Option<String> {
     }
 }
 
+
 #[tauri::command]
-async fn handle_dropped_files(app: AppHandle, paths: Vec<String>) -> Vec<AppFile> {
+async fn handle_dropped_files(app: AppHandle, paths: Vec<String>, state: State<'_, AppState>) -> Result<Vec<AppFile>, String> {
     let resource_path = app
         .path()
         .resolve("resources/libpdfium.dylib", BaseDirectory::Resource)
         .expect("failed to resolve resource");
 
+    // 1. Đếm số lượng file hợp lệ thực tế từ mảng `paths` do user kéo vào
+    let mut incoming_count = 0;
+    for p in &paths {
+        let path_obj = Path::new(p);
+        if path_obj.is_file() {
+            let ext = path_obj.extension().unwrap_or_default().to_string_lossy().to_lowercase();
+            // Chỉ đếm những file app đang hỗ trợ
+            if matches!(ext.as_str(), "mp4" | "mov" | "m4v" | "pdf" | "jpg" | "jpeg" | "png" | "webp") {
+                incoming_count += 1;
+            }
+        }
+    }
+
+    // 2. Tiến hành check giới hạn Free/Pro
+    {
+        let mut config = state.app_config.lock().unwrap();
+        if !config.is_pro {
+            let free_limit = 5;
+
+            if config.processed_files_count + incoming_count > free_limit {
+                return Err("LIMIT_REACHED".to_string()); // Ném lỗi về Svelte
+            }
+
+            // Nếu hợp lệ, cộng dồn số lượng và lưu xuống ổ cứng
+            config.processed_files_count += incoming_count;
+            save_config(&app, &config);
+        }
+    }
+
+    // 3. Xử lý thông tin file và tạo thumbnail (Giữ nguyên 100% code cũ của bạn)
     let mut files = Vec::new();
 
     for p in paths {
@@ -142,12 +222,13 @@ async fn handle_dropped_files(app: AppHandle, paths: Vec<String>) -> Vec<AppFile
             .unwrap_or_default()
             .to_string_lossy()
             .to_lowercase();
+            
         // ext bây giờ là String, dùng &ext là đủ, không cần .as_str()
         let f_type = match ext.as_ref() {
-            "mp4" | "mkv" | "mov" | "avi" => "video",
+            "mp4" | "mov" | "m4v" => "video",
             "pdf" => "pdf",
             "jpg" | "jpeg" | "png" | "webp" => "image",
-            _ => "other",
+            _ => continue,
         };
 
         let metadata = fs::metadata(&p).ok();
@@ -196,8 +277,9 @@ async fn handle_dropped_files(app: AppHandle, paths: Vec<String>) -> Vec<AppFile
         });
     }
 
-    files // Trả về danh sách ngay lập tức
+    Ok(files) // Trả về danh sách ngay lập tức
 }
+
 
 #[tauri::command]
 async fn compress_video_command(
@@ -229,8 +311,6 @@ async fn compress_video_command(
         "codec": codec,
         "muteAudio": mute_audio,
     }).to_string();
-
-    let output_clone = output_path.clone();
 
     // 3. Chạy ngầm trong spawn_blocking
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -438,13 +518,49 @@ fn cancel_compression_command(id: String, file_type: String, state: State<'_, Ap
     // nên ta không gọi cancel_pdf_swift, nó sẽ tự xong trong chốc lát và trả kết quả.
 }
 
+
+// ==========================================
+// 3. API CHO FRONTEND LẤY THÔNG TIN & NHẬP KEY
+// ==========================================
+#[tauri::command]
+fn get_pro_status(state: State<'_, AppState>) -> AppConfig {
+    let config = state.app_config.lock().unwrap().clone();
+    config
+}
+
+#[tauri::command]
+async fn verify_license(key: String, app: AppHandle, state: State<'_, AppState>) -> Result<bool, String> {
+    // TẠI ĐÂY BẠN CÓ THỂ GỌI API ĐẾN LEMONSQUEEZY / GUMROAD TRONG TƯƠNG LAI
+    // Tạm thời mình hardcode key là "TINYPAW-PRO"
+    let is_valid = key.trim() == "TINYPAW-PRO"; 
+
+    if is_valid {
+        let mut config = state.app_config.lock().unwrap();
+        config.is_pro = true;
+        config.license_key = Some(key);
+        save_config(&app, &config);
+        Ok(true)
+    } else {
+        Err("License key is invalid!".to_string())
+    }
+}
+
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .manage(AppState {
-            cancel_flags: std::sync::Mutex::new(std::collections::HashMap::new()),
+        .setup(|app| {
+            // Load config từ ổ cứng lên RAM ngay khi bật app
+            let config = load_config(app.handle());
+            
+            // Manage AppState ở đây thay vì bên dưới
+            app.manage(AppState {
+                cancel_flags: Mutex::new(HashMap::new()),
+                app_config: Mutex::new(config),
+            });
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             handle_dropped_files,
@@ -452,6 +568,8 @@ pub fn run() {
             compress_video_command,
             compress_image_command,
             cancel_compression_command,
+            get_pro_status,
+            verify_license,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

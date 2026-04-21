@@ -3,7 +3,7 @@ import { writable, derived } from 'svelte/store';
 
 // 1. Khai báo các gói ngôn ngữ
 const en = {
-    appName: "TinyPaw Compressor",
+    appName: "TinyPaw",
     dragDropText: "Drop files here to compress",
     filesReady: "Files",
     clearAll: "Clear all",
@@ -17,7 +17,7 @@ const en = {
     
     // Sidebar Empty
     selectFileToView: "Drag & drop files into the main window, or select a file from the list to view its settings.",
-    emptyMainHint: "Ready to squish? Drag and drop your videos, PDFs, or images here to get started.",
+    emptyMainHint: "Ready to squish? Drag and drop your files here to compress videos/images, or compress & unlock PDFs.",
     
     // Video Panel
     videoSettings: "Video Settings",
