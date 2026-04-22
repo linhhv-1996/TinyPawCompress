@@ -108,12 +108,6 @@
             <div class="panel active">
                 <div class="side-header"><h4>{$lang.videoSettings}</h4></div>
 
-                <!-- <div style="transition: 0.2s; {hasTargetSize ? 'opacity: 0.35; pointer-events: none; filter: grayscale(1);' : ''}">
-                    <QualityPreset
-                        bind:value={file.settings.qualityValue}
-                        bind:activeTab={file.settings.qualityTab}
-                    />
-                </div> -->
                 <div style="transition: 0.2s; {hasTargetSize ? 'opacity: 0.35; pointer-events: none; filter: grayscale(1);' : ''}">
                     <PillGroup
                         label={$lang.qualityProfile}
@@ -132,16 +126,27 @@
                     bind:value={file.settings.targetSize}
                     type="number"
                 />
-
-                <!-- <PillGroup
-                    label={$lang.resolution}
-                    bind:activeId={file.settings.resolution}
-                    options={[
-                        { id: "original", label: $lang.resOriginal },
-                        { id: "1080p", label: $lang.res1080p },
-                        { id: "720p", label: $lang.res720p },
-                    ]}
-                /> -->
+                
+                <div class="size-presets">
+                    <button class="size-chip" on:click={() => file.settings.targetSize = 25}>
+                        <i class="ph ph-envelope-simple"></i> Gmail (25MB)
+                    </button>
+                    <button class="size-chip" on:click={() => file.settings.targetSize = 25}>
+                        <i class="ph ph-discord-logo"></i> Discord (25MB)
+                    </button>
+                    <button class="size-chip" on:click={() => file.settings.targetSize = 16}>
+                        <i class="ph ph-whatsapp-logo"></i> WhatsApp (16MB)
+                    </button>
+                    <button class="size-chip" on:click={() => file.settings.targetSize = 50}>
+                        <i class="ph ph-telegram-logo"></i> Telegram (50MB)
+                    </button>
+                    <button class="size-chip" on:click={() => file.settings.targetSize = 72}>
+                        <i class="ph ph-tiktok-logo"></i> TikTok (72MB)
+                    </button>
+                    <button class="size-chip" on:click={() => file.settings.targetSize = 512}>
+                        <i class="ph ph-twitter-logo"></i> Twitter (512MB)
+                    </button>
+                </div>
 
                 <PillGroup
                     label={$lang.videoCodec}
@@ -175,12 +180,13 @@
                     ]}
                 />
 
-                <ToggleRow
+                <!-- <ToggleRow
                     iconClass="ph ph-palette"
                     title={$lang.grayscale}
                     subtitle={$lang.grayscaleDesc}
                     bind:checked={file.settings.grayscale}
-                />
+                /> -->
+
                 <ToggleRow
                     iconClass="ph ph-broom"
                     title={$lang.stripMeta}
@@ -300,5 +306,38 @@
     .btn-compress.cancel-btn:hover {
         background: #DC2626;
         box-shadow: 0 4px 6px rgba(239, 68, 68, 0.25);
+    }
+    .size-presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: -6px; /* Kéo lên gần ô input ở trên một chút */
+        margin-bottom: 16px;
+    }
+
+    .size-chip {
+        background: #F3F4F6;
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+
+    .size-chip i {
+        font-size: 12px;
+    }
+
+    .size-chip:hover {
+        background: #E5E7EB;
+        color: var(--text-main);
+        border-color: #9CA3AF;
     }
 </style>

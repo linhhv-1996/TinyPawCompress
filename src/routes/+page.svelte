@@ -24,6 +24,8 @@
     let licenseError = "";
     let isVerifying = false;
 
+    let showSettingsMenu = false;
+
     const limit = pLimit(1);
     let pendingThumbs = new Map<string, string>();
 
@@ -120,7 +122,7 @@
 
         if (uniquePaths.length === 0) return;
 
-        if (files.length + uniquePaths.length > 5) {
+        if (!isPro && (files.length + uniquePaths.length > 5)) {
             showProModal = true;
             return;
         }
@@ -405,39 +407,45 @@
     <main class="main-content">
         <div class="title-bar" data-tauri-drag-region>
             {$lang.appName}
-                <div class="title-actions">
-                    <button
-                        class="title-btn"
-                        on:click={() => handleOpenExternalLink("https://your-website.com")}
-                        title="Visit Website"
-                    >
-                        <i class="ph ph-info"></i>
-                        <span class="btn-text">Info</span>
-                    </button>
-                
-                <button
-                    class="title-btn"
-                    on:click={() => { if (!isCompressingAll) showToast('Checking for updates...', 'info'); }}
-                    style="{isCompressingAll ? 'opacity: 0.5; cursor: not-allowed;' : ''}"
-                >
-                    <i class="ph ph-arrows-clockwise"></i>
-                    <span class="btn-text">Update</span>
-                </button>
+            <div class="title-actions">
+            <button
+                class="title-btn {showSettingsMenu ? 'active' : ''}"
+                on:click={() => showSettingsMenu = !showSettingsMenu}
+                style="{isCompressingAll ? 'opacity: 0.5; pointer-events: none;' : ''}"
+                title="Settings & Info"
+            >
+                <i class="ph ph-gear" style="font-size: 16px;"></i>
+            </button>
 
-                <button
-                    class="title-btn {isPro ? 'pro-active' : 'pro-btn'}"
-                    on:click={() => { if (!isCompressingAll && !isPro) showProModal = true; }}
-                    style="{isCompressingAll ? 'opacity: 0.5; cursor: not-allowed;' : ''}"
-                >
-                    {#if isPro}
-                        <i class="ph-fill ph-check-circle"></i>
-                        <span class="btn-text">Pro Active</span>
-                    {:else}
-                        <i class="ph-fill ph-crown"></i>
-                        <span class="btn-text">Pro</span>
-                    {/if}
-                </button>
-            </div>
+            {#if showSettingsMenu}
+                <div class="menu-overlay" on:click={() => showSettingsMenu = false}></div>
+                
+                <div class="settings-dropdown">
+                    <div class="dropdown-item {isPro ? 'pro-active' : 'pro-upgrade'}"
+                        on:click={() => { 
+                            showSettingsMenu = false; 
+                            if (!isPro) showProModal = true; 
+                        }}
+                    >
+                        {#if isPro}
+                            <i class="ph-fill ph-check-circle"></i> <span>Pro Active</span>
+                        {:else}
+                            <i class="ph-fill ph-crown"></i> <span>Upgrade to Pro</span>
+                        {/if}
+                    </div>
+
+                    <div class="dropdown-divider"></div>
+
+                    <div class="dropdown-item" on:click={() => { showSettingsMenu = false; showToast('Checking for updates...', 'info'); }}>
+                        <i class="ph ph-arrows-clockwise"></i> <span>Check for Updates</span>
+                    </div>
+
+                    <div class="dropdown-item" on:click={() => { showSettingsMenu = false; handleOpenExternalLink("https://your-website.com"); }}>
+                        <i class="ph ph-info"></i> <span>About TinyPaw</span>
+                    </div>
+                </div>
+            {/if}
+        </div>
         </div>
 
         {#if files.length === 0}
@@ -525,6 +533,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Upgrade to TinyPaw Pro 🐾</h2>
+                <!-- svelte-ignore a11y_consider_explicit_label -->
                 <button class="close-btn" on:click={() => showProModal = false} disabled={isVerifying}>
                     <i class="ph ph-x"></i>
                 </button>
@@ -538,6 +547,7 @@
             <div class="control-group">
                 <div class="control-label" style="display: flex; justify-content: space-between; align-items: center;">
                     <span>Enter License Key:</span>
+                    <!-- svelte-ignore a11y_invalid_attribute -->
                     <a 
                         href="#" 
                         class="buy-link" 
@@ -853,5 +863,84 @@
         background: rgba(254, 242, 242, 0.95);
         color: #DC2626;
         border: 1px solid #FECACA;
+    }
+
+    /* --- CSS CHO DROPDOWN MENU SETTINGS --- */
+    .menu-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 90;
+        cursor: default;
+    }
+
+    .settings-dropdown {
+        position: absolute;
+        top: 32px; /* Cách nút bánh răng một chút */
+        right: 0;
+        background: #FFFFFF;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        width: 180px;
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        padding: 4px;
+        animation: menuFadeIn 0.15s ease-out;
+    }
+
+    @keyframes menuFadeIn {
+        from { opacity: 0; transform: translateY(-5px) scale(0.95); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .dropdown-item {
+        padding: 8px 10px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-main);
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: background 0.15s ease;
+    }
+
+    .dropdown-item:hover {
+        background: #F3F4F6;
+    }
+
+    .dropdown-item i {
+        font-size: 16px;
+        color: var(--text-dim);
+    }
+
+    .dropdown-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 4px 0;
+    }
+
+    /* Làm nổi bật phần PRO trong Menu */
+    .dropdown-item.pro-upgrade {
+        color: #B45309;
+    }
+    .dropdown-item.pro-upgrade i {
+        color: #D97706;
+    }
+    .dropdown-item.pro-upgrade:hover {
+        background: #FEF3C7;
+    }
+
+    .dropdown-item.pro-active {
+        color: #059669;
+        pointer-events: none; /* Tắt click nếu đã kích hoạt Pro */
+    }
+    .dropdown-item.pro-active i {
+        color: #059669;
     }
 </style>
